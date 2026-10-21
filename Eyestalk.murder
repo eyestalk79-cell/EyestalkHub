@@ -1,0 +1,271 @@
+
+local P = game:GetService("Players")
+local U = game:GetService("UserInputService")
+local R = game:GetService("RunService")
+
+local p = P.LocalPlayer
+local g = Instance.new("ScreenGui")
+g.Name = "EyestalkMM2"
+g.ResetOnSpawn = false
+g.Parent = p:WaitForChild("PlayerGui")
+
+local f = Instance.new("Frame", g)
+f.Size = UDim2.fromOffset(260, 455)
+f.Position = UDim2.new(0, 20, 0.2, 0)
+f.BackgroundColor3 = Color3.fromRGB(18, 18, 23)
+f.Active = true
+Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
+
+local st = Instance.new("UIStroke", f)
+st.Color = Color3.fromRGB(255, 35, 50)
+st.Thickness = 2
+
+local title = Instance.new("TextLabel", f)
+title.Size = UDim2.new(1, -45, 0, 45)
+title.BackgroundTransparency = 1
+title.Text = "Eyestalk | MM2"
+title.TextColor3 = Color3.fromRGB(255, 45, 60)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 19
+
+local close = Instance.new("TextButton", f)
+close.Size = UDim2.fromOffset(35, 35)
+close.Position = UDim2.new(1, -40, 0, 5)
+close.Text = "X"
+close.TextColor3 = Color3.new(1, 1, 1)
+close.BackgroundColor3 = Color3.fromRGB(150, 20, 35)
+
+local open = Instance.new("TextButton", g)
+open.Size = UDim2.fromOffset(150, 42)
+open.Position = UDim2.new(0, 15, 0.5, 0)
+open.Text = "Eyestalk | MM2"
+open.Visible = false
+open.BackgroundColor3 = Color3.fromRGB(150, 20, 35)
+open.TextColor3 = Color3.new(1, 1, 1)
+
+local function toggleUI()
+    f.Visible = not f.Visible
+    open.Visible = not f.Visible
+end
+
+close.Activated:Connect(toggleUI)
+open.Activated:Connect(toggleUI)
+
+local function button(txt, y)
+    local b = Instance.new("TextButton", f)
+    b.Size = UDim2.new(1, -24, 0, 43)
+    b.Position = UDim2.fromOffset(12, y)
+    b.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 15
+    b.Text = txt .. " [OFF]"
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
+
+local speed = button("SPEED", 48)
+local jump = button("JUMP BOOST", 95)
+local fly = button("FLY", 142)
+local noclip = button("NOCLIP", 189)
+local esp = button("PLAYER ESP", 236)
+local reset = button("RESET MOVEMENT", 283)
+
+local up = button("FLY UP ▲", 330)
+local down = button("FLY DOWN ▼", 330)
+up.Size = UDim2.new(0.5, -16, 0, 43)
+down.Size = UDim2.new(0.5, -16, 0, 43)
+down.Position = UDim2.new(0.5, 2, 0, 330)
+
+local so, jo, fo, no, eo = false, false, false, false, false
+local vertical = 0
+local highlights = {}
+local old = {}
+local vel, gyro
+
+local function hum()
+    local c = p.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function paint(b, n, v)
+    b.Text = n .. (v and " [ON]" or " [OFF]")
+    b.BackgroundColor3 = v
+        and Color3.fromRGB(170, 25, 40)
+        or Color3.fromRGB(40, 40, 48)
+end
+
+local function apply()
+    local h = hum()
+    if h then
+        h.WalkSpeed = so and 32 or 16
+        h.UseJumpPower = true
+        h.JumpPower = jo and 90 or 50
+    end
+end
+
+speed.Activated:Connect(function()
+    so = not so
+    paint(speed, "SPEED", so)
+    apply()
+end)
+
+jump.Activated:Connect(function()
+    jo = not jo
+    paint(jump, "JUMP BOOST", jo)
+    apply()
+end)
+
+local function stopFly()
+    fo = false
+    if vel then vel:Destroy(); vel = nil end
+    if gyro then gyro:Destroy(); gyro = nil end
+    paint(fly, "FLY", false)
+end
+
+local function startFly()
+    local c = p.Character
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    if not r then return end
+
+    stopFly()
+    fo = true
+
+    vel = Instance.new("BodyVelocity", r)
+    vel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+
+    gyro = Instance.new("BodyGyro", r)
+    gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    gyro.P = 10000
+
+    paint(fly, "FLY", true)
+end
+
+fly.Activated:Connect(function()
+    if fo then stopFly() else startFly() end
+end)
+
+up.Activated:Connect(function()
+    vertical = vertical == 1 and 0 or 1
+    up.Text = vertical == 1 and "FLY UP [ON]" or "FLY UP ▲"
+end)
+
+down.Activated:Connect(function()
+    vertical = vertical == -1 and 0 or -1
+    down.Text = vertical == -1 and "FLY DOWN [ON]" or "FLY DOWN ▼"
+end)
+
+R.RenderStepped:Connect(function()
+    if fo and vel and vel.Parent then
+        local h = hum()
+        local cam = workspace.CurrentCamera
+
+        vel.Velocity =
+            (h and h.MoveDirection or Vector3.zero) * 45
+            + Vector3.new(0, vertical * 35, 0)
+
+        if gyro and cam then
+            gyro.CFrame = cam.CFrame
+        end
+    end
+
+    if no then
+        local c = p.Character
+        if c then
+            for _, x in ipairs(c:GetDescendants()) do
+                if x:IsA("BasePart") then
+                    if old[x] == nil then
+                        old[x] = x.CanCollide
+                    end
+                    x.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+noclip.Activated:Connect(function()
+    no = not no
+    paint(noclip, "NOCLIP", no)
+
+    if not no then
+        for x, v in pairs(old) do
+            if x.Parent then x.CanCollide = v end
+        end
+        table.clear(old)
+    end
+end)
+
+local function clearESP()
+    for _, h in pairs(highlights) do
+        h:Destroy()
+    end
+    table.clear(highlights)
+end
+
+local function refresh()
+    clearESP()
+    if not eo then return end
+
+    for _, q in ipairs(P:GetPlayers()) do
+        if q ~= p and q.Character then
+            local h = Instance.new("Highlight")
+            h.FillColor = Color3.fromRGB(255, 35, 50)
+            h.OutlineColor = Color3.new(1, 1, 1)
+            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h.Adornee = q.Character
+            h.Parent = q.Character
+            highlights[q] = h
+        end
+    end
+end
+
+esp.Activated:Connect(function()
+    eo = not eo
+    paint(esp, "PLAYER ESP", eo)
+    refresh()
+end)
+
+P.PlayerAdded:Connect(function(q)
+    q.CharacterAdded:Connect(function()
+        task.wait(1)
+        refresh()
+    end)
+end)
+
+P.PlayerRemoving:Connect(function(q)
+    if highlights[q] then
+        highlights[q]:Destroy()
+        highlights[q] = nil
+    end
+end)
+
+reset.Activated:Connect(function()
+    so, jo = false, false
+    apply()
+    paint(speed, "SPEED", false)
+    paint(jump, "JUMP BOOST", false)
+    stopFly()
+
+    vertical = 0
+    up.Text = "FLY UP ▲"
+    down.Text = "FLY DOWN ▼"
+
+    no = false
+    for x, v in pairs(old) do
+        if x.Parent then x.CanCollide = v end
+    end
+    table.clear(old)
+    paint(noclip, "NOCLIP", false)
+end)
+
+p.CharacterAdded:Connect(function()
+    task.wait(1)
+    apply()
+    stopFly()
+    no = false
+    table.clear(old)
+    refresh()
+end)
+
+print("Eyestalk | MM2 loaded")
