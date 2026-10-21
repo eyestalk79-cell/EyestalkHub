@@ -1,0 +1,145 @@
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local gui = Instance.new("ScreenGui")
+gui.Name = "EeyestalkAim"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(240, 175)
+frame.Position = UDim2.new(0, 20, 0.55, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(255, 35, 50)
+stroke.Thickness = 2
+
+local function makeButton(text, y)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -20, 0, 42)
+    b.Position = UDim2.fromOffset(10, y)
+    b.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 15
+    b.Text = text .. " [OFF]"
+    b.Parent = frame
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "Eeyestalk|Aim"
+title.TextColor3 = Color3.fromRGB(255, 40, 55)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 19
+
+local playerButton = makeButton("PLAYER AIM", 42)
+local npcButton = makeButton("NPC AIM", 92)
+
+local playerAim = false
+local npcAim = false
+
+local function paint(button, name, enabled)
+    button.Text = name .. (enabled and " [ON]" or " [OFF]")
+    button.BackgroundColor3 = enabled
+        and Color3.fromRGB(160, 25, 40)
+        or Color3.fromRGB(45, 45, 52)
+end
+
+playerButton.Activated:Connect(function()
+    playerAim = not playerAim
+    if playerAim then
+        npcAim = false
+    end
+    paint(playerButton, "PLAYER AIM", playerAim)
+    paint(npcButton, "NPC AIM", npcAim)
+end)
+
+npcButton.Activated:Connect(function()
+    npcAim = not npcAim
+    if npcAim then
+        playerAim = false
+    end
+    paint(playerButton, "PLAYER AIM", playerAim)
+    paint(npcButton, "NPC AIM", npcAim)
+end)
+
+local renderName = "EeyestalkAimTraining"
+
+RunService:BindToRenderStep(
+    renderName,
+    Enum.RenderPriority.Camera.Value + 1,
+    function(dt)
+        local target = nil
+        local nearest = math.huge
+        local character = player.Character
+        local root = character
+            and character:FindFirstChild("HumanoidRootPart")
+        local camera = workspace.CurrentCamera
+
+        if not root or not camera then
+            return
+        end
+
+        local function consider(model)
+            local humanoid =
+                model:FindFirstChildOfClass("Humanoid")
+            local part = model:FindFirstChild("Head")
+                or model:FindFirstChild("HumanoidRootPart")
+
+            if not humanoid or humanoid.Health <= 0 or not part then
+                return
+            end
+
+            local distance =
+                (part.Position - root.Position).Magnitude
+
+            if distance < nearest then
+                nearest = distance
+                target = part
+            end
+        end
+
+        if playerAim then
+            for _, other in ipairs(Players:GetPlayers()) do
+                if other ~= player and other.Character then
+                    consider(other.Character)
+                end
+            end
+        elseif npcAim then
+            for _, model in ipairs(workspace:GetDescendants()) do
+                if model:IsA("Model")
+                    and model ~= character
+                    and not Players:GetPlayerFromCharacter(model)
+                    and model:FindFirstChildOfClass("Humanoid") then
+                    consider(model)
+                end
+            end
+        end
+
+        if target then
+            local goal = CFrame.lookAt(
+                camera.CFrame.Position,
+                target.Position
+            )
+            camera.CFrame = camera.CFrame:Lerp(
+                goal,
+                math.clamp(dt * 5, 0, 1)
+            )
+        end
+    end
+)
+
+script.Destroying:Connect(function()
+    RunService:UnbindFromRenderStep(renderName)
+end)
+
+print("Eeyestalk|Aim loaded")
